@@ -45,7 +45,7 @@
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 15px;
             margin-bottom: 25px;
         }
@@ -57,6 +57,9 @@
             border-top: 4px solid var(--primary-red);
             box-shadow: 0 4px 10px rgba(0,0,0,0.05);
             text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
 
         .stat-card h3 {
@@ -68,6 +71,22 @@
 
         .stat-card .number {
             font-size: 26px;
+            font-weight: bold;
+            color: var(--primary-red);
+        }
+
+        /* Style Rincian Khusus Kartu Bus */
+        .stat-card .detail-box {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px dashed #dee2e6;
+            font-size: 11px;
+            color: #495057;
+            line-height: 1.4;
+            text-align: left;
+        }
+
+        .stat-card .detail-box span {
             font-weight: bold;
             color: var(--primary-red);
         }
@@ -149,9 +168,13 @@
             <h3>SMA / MAHASISWA</h3>
             <div class="number" id="statSmaMhs">0</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" style="border-top-color: #2b2d42;">
             <h3>VIA BUS</h3>
             <div class="number" id="statBus">0</div>
+            <div class="detail-box">
+                👨 <b>Dewasa:</b> <span id="busDewasa">0</span><br>
+                👦 <b>Anak (TK-SMP):</b> <span id="busAnak">0</span>
+            </div>
         </div>
         <div class="stat-card">
             <h3>MANDIRI</h3>
@@ -197,6 +220,10 @@
                     let totalMandiri = 0;
                     let totalPeserta = 0;
 
+                    // Counter Rincian Khusus Bus
+                    let busDewasa = 0;
+                    let busAnak = 0;
+
                     let countsUsia = { 'Dewasa': 0, 'TK': 0, 'SD': 0, 'SMP': 0, 'SMA': 0, 'Mahasiswa': 0 };
                     let countsTransport = { 'Via Bus': 0, 'Mandiri': 0 };
 
@@ -212,30 +239,42 @@
 
                             totalPeserta++;
 
-                            // 1. Transportasi
-                            if (transport.toLowerCase().includes('bus')) {
+                            let upperUsia = peranUsia.toUpperCase();
+                            let isViaBus = transport.toLowerCase().includes('bus');
+
+                            // Klasifikasi Usia
+                            let isAnak = upperUsia.includes('TK') || upperUsia.includes('SD') || upperUsia.includes('SMP');
+
+                            // 1. Hitung Transportasi & Rincian Bus
+                            if (isViaBus) {
                                 countsTransport['Via Bus']++;
                                 totalBus++;
+
+                                if (isAnak) {
+                                    busAnak++;
+                                } else {
+                                    // SMA & Mahasiswa dihitung Dewasa
+                                    busDewasa++;
+                                }
                             } else {
                                 countsTransport['Mandiri']++;
                                 totalMandiri++;
                             }
 
-                            // 2. Kategori Usia
-                            let upper = peranUsia.toUpperCase();
-                            if (upper.includes('TK')) {
+                            // 2. Kategori Usia General
+                            if (upperUsia.includes('TK')) {
                                 countsUsia['TK']++;
                                 totalAnakTkSmp++;
-                            } else if (upper.includes('SD')) {
+                            } else if (upperUsia.includes('SD')) {
                                 countsUsia['SD']++;
                                 totalAnakTkSmp++;
-                            } else if (upper.includes('SMP')) {
+                            } else if (upperUsia.includes('SMP')) {
                                 countsUsia['SMP']++;
                                 totalAnakTkSmp++;
-                            } else if (upper.includes('SMA')) {
+                            } else if (upperUsia.includes('SMA')) {
                                 countsUsia['SMA']++;
                                 totalSmaMhs++;
-                            } else if (upper.includes('MAHASISWA')) {
+                            } else if (upperUsia.includes('MAHASISWA')) {
                                 countsUsia['Mahasiswa']++;
                                 totalSmaMhs++;
                             } else {
@@ -252,6 +291,10 @@
                     document.getElementById('statSmaMhs').innerText = totalSmaMhs;
                     document.getElementById('statBus').innerText = totalBus;
                     document.getElementById('statMandiri').innerText = totalMandiri;
+
+                    // Update Rincian Khusus Kartu Bus
+                    document.getElementById('busDewasa').innerText = busDewasa;
+                    document.getElementById('busAnak').innerText = busAnak;
 
                     renderCharts(countsUsia, countsTransport);
                 })
