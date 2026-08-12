@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Realtime HUT RI</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-red: #d90429;
+            --dark-red: #8d0801;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-dark: #2b2d42;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .header h1 {
+            color: var(--primary-red);
+            font-size: 24px;
+            text-transform: uppercase;
+        }
+
+        .header p {
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 12px;
+            border-top: 4px solid var(--primary-red);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .stat-card .number {
+            font-size: 26px;
+            font-weight: bold;
+            color: var(--primary-red);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .chart-box {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        .chart-box h2 {
+            font-size: 16px;
+            color: var(--primary-red);
+            margin-bottom: 15px;
+            text-align: center;
+            border-bottom: 2px solid #fff0f3;
+            padding-bottom: 8px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .btn-refresh {
+            display: block;
+            margin: 0 auto 20px auto;
+            background: var(--primary-red);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(217, 4, 41, 0.2);
+            transition: all 0.2s;
+        }
+
+        .btn-refresh:hover {
+            background: var(--dark-red);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>📊 DASHBOARD PESERTA HUT RI</h1>
+        <p>Rekap Realtime dari Spreadsheet Tab REKAP_INDIVIDU</p>
+    </div>
+
+    <button class="btn-refresh" onclick="loadDashboardData()">🔄 Update Data Realtime</button>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>TOTAL PESERTA</h3>
+            <div class="number" id="statTotal">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>DEWASA</h3>
+            <div class="number" id="statDewasa">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>ANAK (TK-SMP)</h3>
+            <div class="number" id="statAnak">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>SMA / MAHASISWA</h3>
+            <div class="number" id="statSmaMhs">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>VIA BUS</h3>
+            <div class="number" id="statBus">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>MANDIRI</h3>
+            <div class="number" id="statMandiri">0</div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="chart-box">
+            <h2>Komposisi Peserta (Usia/Jenjang)</h2>
+            <div class="chart-container">
+                <canvas id="chartUsia"></canvas>
+            </div>
+        </div>
+        <div class="chart-box">
+            <h2>Moda Transportasi</h2>
+            <div class="chart-container">
+                <canvas id="chartTransport"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwUhy563sZRsoFwRPuWjqzNzhQlIvyoqYAJyEDesld8RI0lpvP9x-infs1uyGAdry3Y1w/exec';
+
+        let chartUsiaObj = null;
+        let chartTransportObj = null;
+
+        function loadDashboardData() {
+            fetch(`${WEB_APP_URL}?action=getData`)
+                .then(res => res.json())
+                .then(response => {
+                    if (response.status !== "success") {
+                        console.error("Gagal membaca data dari script:", response.message);
+                        return;
+                    }
+
+                    const rows = response.data;
+                    let totalDewasa = 0;
+                    let totalAnakTkSmp = 0;
+                    let totalSmaMhs = 0;
+                    let totalBus = 0;
+                    let totalMandiri = 0;
+                    let totalPeserta = 0;
+
+                    let countsUsia = { 'Dewasa': 0, 'TK': 0, 'SD': 0, 'SMP': 0, 'SMA': 0, 'Mahasiswa': 0 };
+                    let countsTransport = { 'Via Bus': 0, 'Mandiri': 0 };
+
+                    // Looping rows dari Apps Script
+                    rows.forEach((row, idx) => {
+                        if (row.length >= 4) {
+                            let nama = row[2] ? row[2].toString() : '';
+                            let peranUsia = row[3] ? row[3].toString() : '';
+                            let transport = row[4] ? row[4].toString() : '';
+
+                            // Abaikan kata kunci header jika ada
+                            if (peranUsia.toLowerCase().includes('peran') || nama.toLowerCase().includes('nama')) return;
+
+                            totalPeserta++;
+
+                            // 1. Transportasi
+                            if (transport.toLowerCase().includes('bus')) {
+                                countsTransport['Via Bus']++;
+                                totalBus++;
+                            } else {
+                                countsTransport['Mandiri']++;
+                                totalMandiri++;
+                            }
+
+                            // 2. Kategori Usia
+                            let upper = peranUsia.toUpperCase();
+                            if (upper.includes('TK')) {
+                                countsUsia['TK']++;
+                                totalAnakTkSmp++;
+                            } else if (upper.includes('SD')) {
+                                countsUsia['SD']++;
+                                totalAnakTkSmp++;
+                            } else if (upper.includes('SMP')) {
+                                countsUsia['SMP']++;
+                                totalAnakTkSmp++;
+                            } else if (upper.includes('SMA')) {
+                                countsUsia['SMA']++;
+                                totalSmaMhs++;
+                            } else if (upper.includes('MAHASISWA')) {
+                                countsUsia['Mahasiswa']++;
+                                totalSmaMhs++;
+                            } else {
+                                countsUsia['Dewasa']++;
+                                totalDewasa++;
+                            }
+                        }
+                    });
+
+                    // Update Kartu Statistik
+                    document.getElementById('statTotal').innerText = totalPeserta;
+                    document.getElementById('statDewasa').innerText = totalDewasa;
+                    document.getElementById('statAnak').innerText = totalAnakTkSmp;
+                    document.getElementById('statSmaMhs').innerText = totalSmaMhs;
+                    document.getElementById('statBus').innerText = totalBus;
+                    document.getElementById('statMandiri').innerText = totalMandiri;
+
+                    renderCharts(countsUsia, countsTransport);
+                })
+                .catch(err => {
+                    console.error("Gagal mengambil data:", err);
+                });
+        }
+
+        function renderCharts(dataUsia, dataTransport) {
+            const ctxUsia = document.getElementById('chartUsia').getContext('2d');
+            if (chartUsiaObj) chartUsiaObj.destroy();
+            chartUsiaObj = new Chart(ctxUsia, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(dataUsia),
+                    datasets: [{
+                        label: 'Jumlah Orang',
+                        data: Object.values(dataUsia),
+                        backgroundColor: ['#d90429', '#ff4d6d', '#ff758f', '#ffb3c1', '#800f2f', '#590d22'],
+                        borderRadius: 6
+                    }]
+                },
+                options: { 
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } } 
+                }
+            });
+
+            const ctxTransport = document.getElementById('chartTransport').getContext('2d');
+            if (chartTransportObj) chartTransportObj.destroy();
+            chartTransportObj = new Chart(ctxTransport, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(dataTransport),
+                    datasets: [{
+                        data: Object.values(dataTransport),
+                        backgroundColor: ['#d90429', '#2b2d42']
+                    }]
+                },
+                options: { 
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        window.onload = loadDashboardData;
+    </script>
+</body>
+</html>
